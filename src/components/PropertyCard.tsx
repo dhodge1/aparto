@@ -60,7 +60,7 @@ const PropertyCard = ({
     }
   }
 
-  const googleMapsUrl = `https://www.google.com/maps/@${property.latitude},${property.longitude},17z`
+  const googleMapsUrl = `https://www.google.com/maps?q=${property.latitude},${property.longitude}`
 
   return (
     <article className="relative overflow-hidden rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] transition-colors hover:border-[var(--color-accent)]/30">
