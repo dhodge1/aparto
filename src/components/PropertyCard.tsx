@@ -45,7 +45,7 @@ const PropertyCard = ({
   // Build carousel images: featured + first 2 from images array
   const carouselImages = [
     property.featured_image_url,
-    ...property.images_url.slice(0, 2),
+    ...property.images_url.slice(0, 4),
   ].filter(Boolean) as string[]
 
   const handleFavoriteClick = (e: React.MouseEvent | React.KeyboardEvent) => {
