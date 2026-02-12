@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Property, AppNotification } from '@/lib/types'
 import { useFavorites } from '@/hooks/useFavorites'
+import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import PropertyCard from '@/components/PropertyCard'
 import FavoritesView from '@/components/FavoritesView'
 import NotificationBanner from '@/components/NotificationBanner'
@@ -46,6 +47,22 @@ const HomePage = () => {
       setLoading(false)
     }
   }, [])
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setError(null)
+      const response = await fetch('/api/refresh', { method: 'POST' })
+      if (!response.ok) throw new Error('Refresh failed')
+      const json = (await response.json()) as ListingsData
+      setData(json)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Refresh failed')
+    }
+  }, [])
+
+  const { pulling, refreshing, pullDistance, isReady } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  })
 
   useEffect(() => {
     fetchListings()
@@ -98,17 +115,53 @@ const HomePage = () => {
         </div>
       </header>
 
+      {/* Pull-to-refresh indicator */}
+      {(pulling || refreshing) && (
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all"
+          style={{ height: pullDistance }}
+        >
+          <div className={`flex items-center gap-2 text-sm ${isReady || refreshing ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)]'}`}>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={refreshing ? 'animate-spin' : ''}
+              style={{
+                transform: refreshing
+                  ? undefined
+                  : `rotate(${Math.min(pullDistance * 3, 360)}deg)`,
+              }}
+            >
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            {refreshing
+              ? 'Refreshing...'
+              : isReady
+                ? 'Release to refresh'
+                : 'Pull to refresh'}
+          </div>
+        </div>
+      )}
+
       <main className="px-4 py-4">
         {/* Stats bar */}
         <div className="mb-4 flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
           <span>
-            {loading
-              ? 'Loading...'
-              : error
-                ? 'Error loading data'
-                : tab === 'listings'
-                  ? `${data?.count ?? 0} listings matching filters`
-                  : `${favoritesCount} saved favorites`}
+            {refreshing
+              ? 'Refreshing...'
+              : loading
+                ? 'Loading...'
+                : error
+                  ? 'Error loading data'
+                  : tab === 'listings'
+                    ? `${data?.count ?? 0} listings matching filters`
+                    : `${favoritesCount} saved favorites`}
           </span>
           {lastPollFormatted && <span>Checked {lastPollFormatted}</span>}
         </div>
