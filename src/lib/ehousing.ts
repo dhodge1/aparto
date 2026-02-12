@@ -127,12 +127,21 @@ const parseRscPayload = (html: string): EHousingResult => {
  * "properties" key and parse the JSON array that follows.
  */
 const extractProperties = (rscPayload: string): Property[] => {
+  // Check for empty properties array first (0 results)
+  const emptyMarker = '\\"properties\\":[]'
+  if (rscPayload.includes(emptyMarker)) {
+    console.log('[ehousing] Properties array is empty (0 results)')
+    return []
+  }
+
   // The properties data in RSC is escaped with \" notation
   const marker = '\\"properties\\":[{'
 
   const startIdx = rscPayload.indexOf(marker)
   if (startIdx === -1) {
-    throw new Error('Could not find properties array in RSC payload')
+    // Could be a different empty format or missing entirely
+    console.warn('[ehousing] Could not find properties array in RSC payload')
+    return []
   }
 
   // Find the start of the array (after "properties":)
