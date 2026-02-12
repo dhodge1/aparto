@@ -1,8 +1,13 @@
 import type { LivabilityScore } from './types'
 import { getCachedScore, setCachedScore } from './redis'
 
-const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter'
-const RATE_LIMIT_DELAY_MS = 250
+// Primary and fallback Overpass API instances
+const OVERPASS_SERVERS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+]
+const RATE_LIMIT_DELAY_MS = 2000
+const MAX_RETRIES = 3
 
 // --- Scoring weights ---
 
@@ -83,38 +88,69 @@ const fetchAmenityCounts = async (
 );
 out tags;`
 
-  const response = await fetch(OVERPASS_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
-  })
+  let lastError: Error | null = null
 
-  if (!response.ok) {
-    throw new Error(`Overpass API error: ${response.status}`)
+  // Try each server, with retries on the primary
+  for (const serverUrl of OVERPASS_SERVERS) {
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        const backoff = 3000 * Math.pow(2, attempt - 1)
+        console.log(
+          `[livability] Retry ${attempt}/${MAX_RETRIES} on ${serverUrl.split('/')[2]} after ${backoff}ms`
+        )
+        await new Promise((r) => setTimeout(r, backoff))
+      }
+
+      try {
+        const response = await fetch(serverUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `data=${encodeURIComponent(query)}`,
+        })
+
+        if (response.status === 429) {
+          lastError = new Error(`Rate limited (429) on ${serverUrl.split('/')[2]}`)
+          if (attempt === MAX_RETRIES - 1) break // Try next server
+          continue
+        }
+
+        if (!response.ok) {
+          lastError = new Error(`Overpass error ${response.status} on ${serverUrl.split('/')[2]}`)
+          break // Try next server
+        }
+
+        const data = await response.json()
+        const elements = data.elements as Array<{
+          type: string
+          tags?: Record<string, string>
+        }>
+
+        const counts: AmenityCounts = {
+          supermarkets: 0,
+          restaurants: 0,
+          convenience: 0,
+          parks: 0,
+        }
+
+        for (const el of elements) {
+          const tags = el.tags ?? {}
+          if (tags.shop === 'supermarket') counts.supermarkets++
+          else if (tags.amenity === 'restaurant') counts.restaurants++
+          else if (tags.shop === 'convenience') counts.convenience++
+          else if (tags.leisure === 'park') counts.parks++
+        }
+
+        return counts
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error(String(e))
+        break // Network error, try next server
+      }
+    }
+
+    console.log(`[livability] Falling back from ${serverUrl.split('/')[2]}`)
   }
 
-  const data = await response.json()
-  const elements = data.elements as Array<{
-    type: string
-    tags?: Record<string, string>
-  }>
-
-  const counts: AmenityCounts = {
-    supermarkets: 0,
-    restaurants: 0,
-    convenience: 0,
-    parks: 0,
-  }
-
-  for (const el of elements) {
-    const tags = el.tags ?? {}
-    if (tags.shop === 'supermarket') counts.supermarkets++
-    else if (tags.amenity === 'restaurant') counts.restaurants++
-    else if (tags.shop === 'convenience') counts.convenience++
-    else if (tags.leisure === 'park') counts.parks++
-  }
-
-  return counts
+  throw lastError ?? new Error('All Overpass servers failed')
 }
 
 // --- Score computation ---
