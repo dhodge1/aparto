@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Property, AppNotification, FilterSettings } from '@/lib/types'
 import { useFavorites } from '@/hooks/useFavorites'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
@@ -92,6 +92,52 @@ const HomePage = () => {
   const { pulling, refreshing, pullDistance, isReady } = usePullToRefresh({
     onRefresh: handleRefresh,
   })
+
+  // Swipe-to-open settings from left edge
+  const edgeSwipeStartX = useRef(0)
+  const edgeSwipeActive = useRef(false)
+
+  useEffect(() => {
+    const handleEdgeTouchStart = (e: TouchEvent) => {
+      if (settingsOpen) return
+      const x = e.touches[0].clientX
+      // Only trigger if starting from the left 20px edge
+      if (x < 20) {
+        edgeSwipeStartX.current = x
+        edgeSwipeActive.current = true
+      }
+    }
+
+    const handleEdgeTouchMove = (e: TouchEvent) => {
+      if (!edgeSwipeActive.current) return
+      const x = e.touches[0].clientX
+      const delta = x - edgeSwipeStartX.current
+      if (delta > 80) {
+        edgeSwipeActive.current = false
+        setSettingsOpen(true)
+      }
+    }
+
+    const handleEdgeTouchEnd = () => {
+      edgeSwipeActive.current = false
+    }
+
+    document.addEventListener('touchstart', handleEdgeTouchStart, {
+      passive: true,
+    })
+    document.addEventListener('touchmove', handleEdgeTouchMove, {
+      passive: true,
+    })
+    document.addEventListener('touchend', handleEdgeTouchEnd, {
+      passive: true,
+    })
+
+    return () => {
+      document.removeEventListener('touchstart', handleEdgeTouchStart)
+      document.removeEventListener('touchmove', handleEdgeTouchMove)
+      document.removeEventListener('touchend', handleEdgeTouchEnd)
+    }
+  }, [settingsOpen])
 
   useEffect(() => {
     fetchListings()

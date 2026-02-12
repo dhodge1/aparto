@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { FilterSettings } from '@/lib/types'
 import { DEFAULT_FILTERS } from '@/lib/types'
-import { WARDS, TRAIN_LINES } from '@/lib/station-data'
+import { WARDS } from '@/lib/station-data'
 import WardSelector from './WardSelector'
-import StationSelector from './StationSelector'
 
 type SettingsPanelProps = {
   isOpen: boolean
@@ -13,10 +12,38 @@ type SettingsPanelProps = {
   onApply: (filters: FilterSettings) => Promise<void>
 }
 
+const SAVE_TIMEOUT_MS = 10000
+
 const SettingsPanel = ({ isOpen, onClose, onApply }: SettingsPanelProps) => {
   const [filters, setFilters] = useState<FilterSettings>(DEFAULT_FILTERS)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Swipe gesture state
+  const panelRef = useRef<HTMLDivElement>(null)
+  const swipeStartX = useRef(0)
+  const swipeCurrentX = useRef(0)
+  const isSwiping = useRef(false)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+
+  // Lock body scroll when panel is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.touchAction = 'none'
+    } else {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+      setSwipeOffset(0)
+      setSaveError(false)
+    }
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+    }
+  }, [isOpen])
 
   // Load current settings from server when panel opens
   useEffect(() => {
@@ -65,79 +92,130 @@ const SettingsPanel = ({ isOpen, onClose, onApply }: SettingsPanelProps) => {
     })
   }, [])
 
-  const handleToggleStation = useCallback((stationId: number) => {
-    setFilters((prev) => {
-      const isSelected = prev.stations.includes(stationId)
-
-      // Find station name from all lines
-      let stationName = ''
-      for (const line of TRAIN_LINES) {
-        const station = line.stations.find((s) => s.id === stationId)
-        if (station) {
-          stationName = station.name
-          break
-        }
-      }
-
-      if (isSelected) {
-        return {
-          ...prev,
-          stations: prev.stations.filter((id) => id !== stationId),
-          stationNames: prev.stationNames.filter(
-            (name) => name !== stationName
-          ),
-        }
-      }
-
-      return {
-        ...prev,
-        stations: [...prev.stations, stationId],
-        stationNames: [...prev.stationNames, stationName],
-      }
-    })
-  }, [])
-
   const handleReset = useCallback(() => {
     setFilters(DEFAULT_FILTERS)
   }, [])
 
+  const canClose = !saving
+
+  const handleClose = useCallback(() => {
+    if (!canClose) return
+    onClose()
+  }, [canClose, onClose])
+
   const handleApply = useCallback(async () => {
-    if (filters.wards.length === 0) return
+    if (filters.wards.length === 0 || saving) return
 
     setSaving(true)
+    setSaveError(false)
+
+    // Safety timeout: allow closing after 10 seconds even if save hangs
+    saveTimerRef.current = setTimeout(() => {
+      setSaving(false)
+      setSaveError(true)
+    }, SAVE_TIMEOUT_MS)
+
     try {
       await onApply(filters)
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      setSaving(false)
       onClose()
     } catch (e) {
       console.error('Failed to save settings:', e)
-    } finally {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       setSaving(false)
+      setSaveError(true)
     }
-  }, [filters, onApply, onClose])
+  }, [filters, saving, onApply, onClose])
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
+
+  // --- Swipe gesture handlers ---
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (saving) return
+      swipeStartX.current = e.touches[0].clientX
+      isSwiping.current = true
+    },
+    [saving]
+  )
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!isSwiping.current || saving) return
+      swipeCurrentX.current = e.touches[0].clientX
+      const delta = swipeStartX.current - swipeCurrentX.current
+
+      // Only allow swiping left (to close)
+      if (delta > 0) {
+        setSwipeOffset(Math.min(delta, 300))
+      }
+    },
+    [saving]
+  )
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isSwiping.current || saving) return
+    isSwiping.current = false
+
+    // Close if swiped more than 100px to the left
+    if (swipeOffset > 100) {
+      onClose()
+    }
+    setSwipeOffset(0)
+  }, [swipeOffset, saving, onClose])
+
+  // --- Swipe-to-open from left edge (on backdrop/main page) ---
+  // This is handled in the parent page component
 
   if (!isOpen) return null
+
+  const panelTranslate = swipeOffset > 0 ? -swipeOffset : 0
 
   return (
     <>
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         aria-hidden="true"
+        style={{
+          opacity: swipeOffset > 0 ? 1 - swipeOffset / 400 : 1,
+        }}
       />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-sm flex-col bg-[var(--color-bg)] shadow-2xl">
+      <div
+        ref={panelRef}
+        className="fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-sm flex-col bg-[var(--color-bg)] shadow-2xl transition-transform"
+        style={{
+          transform: `translateX(${panelTranslate}px)`,
+          transitionDuration: isSwiping.current ? '0ms' : '200ms',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
           <h2 className="text-lg font-bold text-[var(--color-text)]">
             Search Filters
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={!canClose}
             aria-label="Close settings"
             tabIndex={0}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
           >
             <svg
               width="20"
@@ -155,7 +233,7 @@ const SettingsPanel = ({ isOpen, onClose, onApply }: SettingsPanelProps) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <span className="text-sm text-[var(--color-text-secondary)]">
@@ -163,25 +241,25 @@ const SettingsPanel = ({ isOpen, onClose, onApply }: SettingsPanelProps) => {
               </span>
             </div>
           ) : (
-            <div className="space-y-6">
-              <WardSelector
-                selectedWards={filters.wards}
-                onToggleWard={handleToggleWard}
-              />
-              <StationSelector
-                selectedStations={filters.stations}
-                onToggleStation={handleToggleStation}
-              />
-            </div>
+            <WardSelector
+              selectedWards={filters.wards}
+              onToggleWard={handleToggleWard}
+            />
           )}
         </div>
 
         {/* Footer */}
         <div className="border-t border-[var(--color-border)] px-4 py-3">
+          {saveError && (
+            <p className="mb-2 text-center text-xs text-red-400">
+              Failed to apply filters. You can try again or close.
+            </p>
+          )}
           <div className="flex items-center gap-3">
             <button
               onClick={handleReset}
-              className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+              disabled={saving}
+              className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] disabled:opacity-30"
               tabIndex={0}
             >
               Reset
