@@ -1,6 +1,6 @@
 # Aparto - Tokyo Apartment Listing Notifier
 
-A PWA that monitors [e-housing.jp](https://e-housing.jp) for new rental listings matching your criteria and sends push notifications to your phone.
+A PWA that monitors housing sites for new rental listings matching your criteria and sends push notifications to your phone.
 
 ## Features
 
