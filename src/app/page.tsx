@@ -91,6 +91,7 @@ const HomePage = () => {
 
   const { pulling, refreshing, pullDistance, isReady } = usePullToRefresh({
     onRefresh: handleRefresh,
+    disabled: settingsOpen,
   })
 
   // Swipe-to-open settings from left edge

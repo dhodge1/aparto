@@ -5,11 +5,13 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 type UsePullToRefreshOptions = {
   onRefresh: () => Promise<void>
   threshold?: number
+  disabled?: boolean
 }
 
 export const usePullToRefresh = ({
   onRefresh,
   threshold = 80,
+  disabled = false,
 }: UsePullToRefreshOptions) => {
   const [pulling, setPulling] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -21,17 +23,17 @@ export const usePullToRefresh = ({
 
   const handleTouchStart = useCallback(
     (e: TouchEvent) => {
-      // Only trigger when scrolled to top
-      if (window.scrollY > 0 || refreshing) return
+      // Don't trigger when disabled (e.g., settings panel open)
+      if (disabled || window.scrollY > 0 || refreshing) return
       startY.current = e.touches[0].clientY
       isPulling.current = true
     },
-    [refreshing]
+    [disabled, refreshing]
   )
 
   const handleTouchMove = useCallback(
     (e: TouchEvent) => {
-      if (!isPulling.current || refreshing) return
+      if (!isPulling.current || disabled || refreshing) return
 
       currentY.current = e.touches[0].clientY
       const distance = Math.max(0, currentY.current - startY.current)
