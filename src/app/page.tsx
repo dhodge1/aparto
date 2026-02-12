@@ -1,7 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { Property, AppNotification, FilterSettings } from '@/lib/types'
+import type {
+  Property,
+  AppNotification,
+  FilterSettings,
+  LivabilityScore,
+} from '@/lib/types'
 import { useFavorites } from '@/hooks/useFavorites'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import PropertyCard from '@/components/PropertyCard'
@@ -27,6 +32,8 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [scores, setScores] = useState<Record<string, LivabilityScore>>({})
+  const [scoresLoading, setScoresLoading] = useState(false)
 
   const {
     favorites,
@@ -36,6 +43,44 @@ const HomePage = () => {
     count: favoritesCount,
   } = useFavorites()
 
+  const fetchScores = useCallback(async (listings: Property[]) => {
+    if (listings.length === 0) return
+
+    setScoresLoading(true)
+    try {
+      // Build property descriptors: id:lat:lng:walkMin
+      const descriptors = listings.map((p) => {
+        const nearestStation = p.trainStations.reduce(
+          (nearest, station) => {
+            if (
+              !nearest ||
+              station.meta_data.pivot_walking_distance_minutes <
+                nearest.meta_data.pivot_walking_distance_minutes
+            ) {
+              return station
+            }
+            return nearest
+          },
+          null as (typeof p.trainStations)[0] | null
+        )
+        const walkMin =
+          nearestStation?.meta_data.pivot_walking_distance_minutes ?? 15
+        return `${p.id}:${p.latitude}:${p.longitude}:${walkMin}`
+      })
+
+      const response = await fetch(
+        `/api/scores?properties=${descriptors.join(',')}`
+      )
+      if (!response.ok) throw new Error('Failed to fetch scores')
+      const json = await response.json()
+      setScores(json.scores ?? {})
+    } catch (err) {
+      console.error('Score fetch error:', err)
+    } finally {
+      setScoresLoading(false)
+    }
+  }, [])
+
   const fetchListings = useCallback(async () => {
     try {
       setLoading(true)
@@ -44,12 +89,14 @@ const HomePage = () => {
       if (!response.ok) throw new Error('Failed to fetch listings')
       const json = (await response.json()) as ListingsData
       setData(json)
+      // Fetch scores asynchronously after listings load
+      fetchScores(json.listings)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchScores])
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -58,10 +105,11 @@ const HomePage = () => {
       if (!response.ok) throw new Error('Refresh failed')
       const json = (await response.json()) as ListingsData
       setData(json)
+      fetchScores(json.listings)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed')
     }
-  }, [])
+  }, [fetchScores])
 
   const handleApplyFilters = useCallback(
     async (filters: FilterSettings) => {
@@ -338,6 +386,8 @@ const HomePage = () => {
                     property={property}
                     isFavorite={favoritesLoaded && isFavorite(property.id)}
                     onToggleFavorite={toggleFavorite}
+                    score={scores[String(property.id)]}
+                    scoreLoading={scoresLoading}
                   />
                 ))}
               </div>

@@ -2,20 +2,25 @@
 
 import { useRef, useState } from 'react'
 import Image from 'next/image'
-import type { Property } from '@/lib/types'
+import type { Property, LivabilityScore } from '@/lib/types'
 import { buildPropertyUrl } from '@/lib/ehousing'
 
 type PropertyCardProps = {
   property: Property
   isFavorite: boolean
   onToggleFavorite: (property: Property) => void
+  score?: LivabilityScore | null
+  scoreLoading?: boolean
 }
 
 const PropertyCard = ({
   property,
   isFavorite,
   onToggleFavorite,
+  score,
+  scoreLoading,
 }: PropertyCardProps) => {
+  const [showBreakdown, setShowBreakdown] = useState(false)
   const nearestStation = property.trainStations.reduce(
     (nearest, station) => {
       if (
@@ -144,37 +149,53 @@ const PropertyCard = ({
           <span>{property.layout}</span>
         </div>
 
-        {/* Nearest station - links to Google Maps */}
-        {nearestStation && (
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-            aria-label={`View ${nearestStation.name} Station on Google Maps`}
-            tabIndex={0}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        {/* Station + Score row */}
+        <div className="flex items-center justify-between gap-3">
+          {/* Nearest station - links to Google Maps */}
+          {nearestStation && (
+            <a
+              href={googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+              aria-label={`View ${nearestStation.name} Station on Google Maps`}
+              tabIndex={0}
             >
-              <rect x="4" y="3" width="16" height="18" rx="2" />
-              <path d="M12 17v4" />
-              <path d="M8 21h8" />
-              <path d="M12 3v8" />
-              <circle cx="12" cy="14" r="2" />
-            </svg>
-            <span className="underline decoration-dotted underline-offset-2">
-              {nearestStation.name} -{' '}
-              {nearestStation.meta_data.pivot_walking_distance_minutes} min walk
-            </span>
-          </a>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="4" y="3" width="16" height="18" rx="2" />
+                <path d="M12 17v4" />
+                <path d="M8 21h8" />
+                <path d="M12 3v8" />
+                <circle cx="12" cy="14" r="2" />
+              </svg>
+              <span className="underline decoration-dotted underline-offset-2">
+                {nearestStation.name} -{' '}
+                {nearestStation.meta_data.pivot_walking_distance_minutes} min walk
+              </span>
+            </a>
+          )}
+
+          {/* Livability score badge */}
+          <ScoreBadge
+            score={score}
+            loading={scoreLoading}
+            showBreakdown={showBreakdown}
+            onToggleBreakdown={() => setShowBreakdown((prev) => !prev)}
+          />
+        </div>
+
+        {/* Score breakdown (expandable) */}
+        {showBreakdown && score && score.overall > 0 && (
+          <ScoreBreakdown score={score} />
         )}
       </div>
     </article>
@@ -255,6 +276,142 @@ const ImageCarousel = ({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// --- Score Badge ---
+
+const getScoreColor = (score: number): string => {
+  if (score >= 8) return 'bg-[var(--color-success)]'
+  if (score >= 5) return 'bg-[var(--color-warning)]'
+  return 'bg-red-500'
+}
+
+const getScoreTextColor = (score: number): string => {
+  if (score >= 8) return 'text-[var(--color-success)]'
+  if (score >= 5) return 'text-[var(--color-warning)]'
+  return 'text-red-500'
+}
+
+const ScoreBadge = ({
+  score,
+  loading,
+  showBreakdown,
+  onToggleBreakdown,
+}: {
+  score?: LivabilityScore | null
+  loading?: boolean
+  showBreakdown: boolean
+  onToggleBreakdown: () => void
+}) => {
+  if (loading) {
+    return (
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-hover)]">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--color-text-secondary)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="animate-spin"
+        >
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      </div>
+    )
+  }
+
+  if (!score || score.overall === 0) return null
+
+  return (
+    <button
+      onClick={onToggleBreakdown}
+      aria-expanded={showBreakdown}
+      aria-label={`Livability score: ${score.overall} out of 10. Tap for breakdown.`}
+      tabIndex={0}
+      className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors ${
+        showBreakdown
+          ? 'bg-[var(--color-surface-hover)]'
+          : 'hover:bg-[var(--color-surface-hover)]'
+      }`}
+    >
+      <div
+        className={`h-2.5 w-2.5 rounded-full ${getScoreColor(score.overall)}`}
+      />
+      <span
+        className={`text-sm font-bold ${getScoreTextColor(score.overall)}`}
+      >
+        {score.overall.toFixed(1)}
+      </span>
+    </button>
+  )
+}
+
+// --- Score Breakdown ---
+
+const ScoreBreakdown = ({ score }: { score: LivabilityScore }) => {
+  const items = [
+    {
+      label: 'Station',
+      value: score.station,
+      detail: `${score.counts.nearestStationMinutes} min walk`,
+    },
+    {
+      label: 'Grocery',
+      value: score.supermarkets,
+      detail: `${score.counts.supermarkets} within 500m`,
+    },
+    {
+      label: 'Dining',
+      value: score.restaurants,
+      detail: `${score.counts.restaurants} within 500m`,
+    },
+    {
+      label: 'Konbini',
+      value: score.convenience,
+      detail: `${score.counts.convenience} within 300m`,
+    },
+    {
+      label: 'Parks',
+      value: score.parks,
+      detail: `${score.counts.parks} within 500m`,
+    },
+  ]
+
+  return (
+    <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+        Livability Breakdown
+      </div>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center gap-3">
+            <span className="w-14 shrink-0 text-xs text-[var(--color-text-secondary)]">
+              {item.label}
+            </span>
+            <div className="flex-1">
+              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-hover)]">
+                <div
+                  className={`h-full rounded-full transition-all ${getScoreColor(item.value)}`}
+                  style={{ width: `${item.value * 10}%` }}
+                />
+              </div>
+            </div>
+            <span
+              className={`w-6 shrink-0 text-right text-xs font-semibold ${getScoreTextColor(item.value)}`}
+            >
+              {item.value}
+            </span>
+            <span className="w-20 shrink-0 text-right text-[10px] text-[var(--color-text-secondary)]">
+              {item.detail}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

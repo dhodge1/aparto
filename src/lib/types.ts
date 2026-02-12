@@ -131,6 +131,24 @@ export type FilterSettings = {
   bedRooms?: number
 }
 
+export type LivabilityScore = {
+  propertyId: number
+  overall: number
+  station: number
+  supermarkets: number
+  restaurants: number
+  convenience: number
+  parks: number
+  counts: {
+    supermarkets: number
+    restaurants: number
+    convenience: number
+    parks: number
+    nearestStationMinutes: number
+  }
+  computedAt: string
+}
+
 export const DEFAULT_FILTERS: FilterSettings = {
   wards: [1, 2, 4, 5, 9],
   wardNames: [

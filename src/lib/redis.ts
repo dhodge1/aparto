@@ -4,6 +4,7 @@ import type {
   PushSubscriptionRecord,
   AppNotification,
   FilterSettings,
+  LivabilityScore,
 } from './types'
 import { DEFAULT_FILTERS } from './types'
 
@@ -132,6 +133,50 @@ export const setFilterSettings = async (
   filters: FilterSettings
 ): Promise<void> => {
   await redis.set(FILTERS_KEY, filters)
+}
+
+// --- Livability Scores ---
+
+const SCORE_KEY_PREFIX = 'score:'
+const SCORE_TTL_SECONDS = 7 * 24 * 60 * 60 // 7 days
+
+export const getCachedScore = async (
+  propertyId: number
+): Promise<LivabilityScore | null> => {
+  return redis.get<LivabilityScore>(`${SCORE_KEY_PREFIX}${propertyId}`)
+}
+
+export const getCachedScores = async (
+  propertyIds: number[]
+): Promise<Map<number, LivabilityScore>> => {
+  if (propertyIds.length === 0) return new Map()
+
+  const pipeline = redis.pipeline()
+  for (const id of propertyIds) {
+    pipeline.get(`${SCORE_KEY_PREFIX}${id}`)
+  }
+
+  const results = await pipeline.exec()
+  const scoreMap = new Map<number, LivabilityScore>()
+
+  for (let i = 0; i < propertyIds.length; i++) {
+    const score = results[i] as LivabilityScore | null
+    if (score) {
+      scoreMap.set(propertyIds[i], score)
+    }
+  }
+
+  return scoreMap
+}
+
+export const setCachedScore = async (
+  score: LivabilityScore
+): Promise<void> => {
+  await redis.set(
+    `${SCORE_KEY_PREFIX}${score.propertyId}`,
+    score,
+    { ex: SCORE_TTL_SECONDS }
+  )
 }
 
 export default redis
