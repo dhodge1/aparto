@@ -8,7 +8,6 @@ import type {
   LivabilityScore,
 } from '@/lib/types'
 import { useFavorites } from '@/hooks/useFavorites'
-import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import PropertyCard from '@/components/PropertyCard'
 import FavoritesView from '@/components/FavoritesView'
 import NotificationBanner from '@/components/NotificationBanner'
@@ -34,6 +33,7 @@ const HomePage = () => {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [scores, setScores] = useState<Record<string, LivabilityScore>>({})
   const [scoresLoading, setScoresLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const {
     favorites,
@@ -100,6 +100,7 @@ const HomePage = () => {
 
   const handleRefresh = useCallback(async () => {
     try {
+      setRefreshing(true)
       setError(null)
       const response = await fetch('/api/refresh', { method: 'POST' })
       if (!response.ok) throw new Error('Refresh failed')
@@ -108,6 +109,8 @@ const HomePage = () => {
       fetchScores(json.listings)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed')
+    } finally {
+      setRefreshing(false)
     }
   }, [fetchScores])
 
@@ -136,11 +139,6 @@ const HomePage = () => {
     },
     [fetchListings]
   )
-
-  const { pulling, refreshing, pullDistance, isReady } = usePullToRefresh({
-    onRefresh: handleRefresh,
-    disabled: settingsOpen,
-  })
 
   // Swipe-to-open settings from left edge
   const edgeSwipeStartX = useRef(0)
@@ -256,56 +254,18 @@ const HomePage = () => {
         </div>
       </header>
 
-      {/* Pull-to-refresh indicator */}
-      {(pulling || refreshing) && (
-        <div
-          className="flex items-center justify-center overflow-hidden transition-all"
-          style={{ height: pullDistance }}
-        >
-          <div
-            className={`flex items-center gap-2 text-sm ${isReady || refreshing ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)]'}`}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={refreshing ? 'animate-spin' : ''}
-              style={{
-                transform: refreshing
-                  ? undefined
-                  : `rotate(${Math.min(pullDistance * 3, 360)}deg)`,
-              }}
-            >
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            {refreshing
-              ? 'Refreshing...'
-              : isReady
-                ? 'Release to refresh'
-                : 'Pull to refresh'}
-          </div>
-        </div>
-      )}
-
       <main className="px-4 py-4">
         {/* Stats bar */}
         <div className="mb-4 flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
           <div className="flex items-center gap-2">
             <span>
-              {refreshing
-                ? 'Refreshing...'
-                : loading
-                  ? 'Loading...'
-                  : error
-                    ? 'Error loading data'
-                    : tab === 'listings'
-                      ? `${data?.count ?? 0} listings`
-                      : `${favoritesCount} saved`}
+              {loading
+                ? 'Loading...'
+                : error
+                  ? 'Error loading data'
+                  : tab === 'listings'
+                    ? `${data?.count ?? 0} listings`
+                    : `${favoritesCount} saved`}
             </span>
             {/* View on e-housing link */}
             {tab === 'listings' && data?.searchUrl && (
@@ -334,7 +294,30 @@ const HomePage = () => {
               </a>
             )}
           </div>
-          {lastPollFormatted && <span>Checked {lastPollFormatted}</span>}
+          <div className="flex items-center gap-2">
+            {lastPollFormatted && <span>Checked {lastPollFormatted}</span>}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              aria-label="Refresh listings"
+              tabIndex={0}
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-accent)] disabled:opacity-40"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={refreshing ? 'animate-spin' : ''}
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Error state */}
