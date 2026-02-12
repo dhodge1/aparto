@@ -116,3 +116,36 @@ export type PushSubscriptionRecord = {
   }
   createdAt: string
 }
+
+export type FilterSettings = {
+  wards: number[]
+  wardNames: string[]
+  stations: number[]
+  stationNames: string[]
+  priceFrom: number
+  priceTo: number
+  areaFrom: number
+  areaTo: string
+  walkingDistanceTo: number
+  features: number[]
+  bedRooms?: number
+}
+
+export const DEFAULT_FILTERS: FilterSettings = {
+  wards: [1, 2, 4, 5, 9],
+  wardNames: [
+    'Minato Ward',
+    'Shibuya Ward',
+    'Meguro Ward',
+    'Setagaya Ward',
+    'Shinagawa Ward',
+  ],
+  stations: [],
+  stationNames: [],
+  priceFrom: 0,
+  priceTo: 260000,
+  areaFrom: 45,
+  areaTo: '100+',
+  walkingDistanceTo: 12,
+  features: [18],
+}

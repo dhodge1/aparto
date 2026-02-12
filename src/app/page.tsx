@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { Property, AppNotification } from '@/lib/types'
+import type { Property, AppNotification, FilterSettings } from '@/lib/types'
 import { useFavorites } from '@/hooks/useFavorites'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import PropertyCard from '@/components/PropertyCard'
@@ -9,6 +9,7 @@ import FavoritesView from '@/components/FavoritesView'
 import NotificationBanner from '@/components/NotificationBanner'
 import SubscribeButton from '@/components/SubscribeButton'
 import InstallPrompt from '@/components/InstallPrompt'
+import SettingsPanel from '@/components/SettingsPanel'
 
 type Tab = 'listings' | 'favorites'
 
@@ -17,6 +18,7 @@ type ListingsData = {
   lastPoll: string | null
   notifications: AppNotification[]
   count: number
+  searchUrl?: string
 }
 
 const HomePage = () => {
@@ -24,6 +26,7 @@ const HomePage = () => {
   const [data, setData] = useState<ListingsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const {
     favorites,
@@ -60,6 +63,32 @@ const HomePage = () => {
     }
   }, [])
 
+  const handleApplyFilters = useCallback(
+    async (filters: FilterSettings) => {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(filters),
+      })
+
+      if (!response.ok) throw new Error('Failed to save settings')
+
+      const json = await response.json()
+      setData((prev) => ({
+        ...prev,
+        listings: json.listings,
+        count: json.count,
+        lastPoll: new Date().toISOString(),
+        notifications: prev?.notifications ?? [],
+        searchUrl: undefined, // Will be refreshed on next listings fetch
+      }))
+
+      // Refresh to get the updated search URL
+      await fetchListings()
+    },
+    [fetchListings]
+  )
+
   const { pulling, refreshing, pullDistance, isReady } = usePullToRefresh({
     onRefresh: handleRefresh,
   })
@@ -86,11 +115,28 @@ const HomePage = () => {
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur-sm">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent)]/20">
-              <span className="text-base font-bold text-[var(--color-accent)]">
-                A
-              </span>
-            </div>
+            {/* Hamburger menu */}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Open search filters"
+              tabIndex={0}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
             <h1 className="text-lg font-bold text-[var(--color-text)]">
               Aparto
             </h1>
@@ -121,7 +167,9 @@ const HomePage = () => {
           className="flex items-center justify-center overflow-hidden transition-all"
           style={{ height: pullDistance }}
         >
-          <div className={`flex items-center gap-2 text-sm ${isReady || refreshing ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)]'}`}>
+          <div
+            className={`flex items-center gap-2 text-sm ${isReady || refreshing ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)]'}`}
+          >
             <svg
               width="16"
               height="16"
@@ -152,17 +200,45 @@ const HomePage = () => {
       <main className="px-4 py-4">
         {/* Stats bar */}
         <div className="mb-4 flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
-          <span>
-            {refreshing
-              ? 'Refreshing...'
-              : loading
-                ? 'Loading...'
-                : error
-                  ? 'Error loading data'
-                  : tab === 'listings'
-                    ? `${data?.count ?? 0} listings matching filters`
-                    : `${favoritesCount} saved favorites`}
-          </span>
+          <div className="flex items-center gap-2">
+            <span>
+              {refreshing
+                ? 'Refreshing...'
+                : loading
+                  ? 'Loading...'
+                  : error
+                    ? 'Error loading data'
+                    : tab === 'listings'
+                      ? `${data?.count ?? 0} listings`
+                      : `${favoritesCount} saved`}
+            </span>
+            {/* View on e-housing link */}
+            {tab === 'listings' && data?.searchUrl && (
+              <a
+                href={data.searchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[var(--color-accent)] hover:underline"
+                aria-label="View search on e-housing.jp"
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                e-housing
+              </a>
+            )}
+          </div>
           {lastPollFormatted && <span>Checked {lastPollFormatted}</span>}
         </div>
 
@@ -220,7 +296,7 @@ const HomePage = () => {
               </div>
             ) : (
               !loading && (
-                <EmptyState message="No listings found. Data will appear after the first poll runs." />
+                <EmptyState message="No listings found. Try adjusting your filters or wait for the next poll." />
               )
             )}
           </div>
@@ -238,6 +314,13 @@ const HomePage = () => {
 
       {/* Install prompt */}
       <InstallPrompt />
+
+      {/* Settings panel */}
+      <SettingsPanel
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onApply={handleApplyFilters}
+      />
     </div>
   )
 }

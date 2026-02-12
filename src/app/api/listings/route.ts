@@ -3,21 +3,27 @@ import {
   getCachedListings,
   getLastPollTimestamp,
   getNotificationHistory,
+  getFilterSettings,
 } from '@/lib/redis'
+import { buildSearchUrl } from '@/lib/ehousing'
 
 export const GET = async (): Promise<NextResponse> => {
   try {
-    const [listings, lastPoll, notifications] = await Promise.all([
+    const [listings, lastPoll, notifications, filters] = await Promise.all([
       getCachedListings(),
       getLastPollTimestamp(),
       getNotificationHistory(),
+      getFilterSettings(),
     ])
+
+    const searchUrl = buildSearchUrl(filters)
 
     return NextResponse.json({
       listings,
       lastPoll,
       notifications,
       count: listings.length,
+      searchUrl,
     })
   } catch (error) {
     console.error('Listings fetch error:', error)

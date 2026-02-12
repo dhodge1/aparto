@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef, useState } from 'react'
 import Image from 'next/image'
 import type { Property } from '@/lib/types'
 import { buildPropertyUrl } from '@/lib/ehousing'
@@ -36,6 +37,12 @@ const PropertyCard = ({
     property.room_number
   )
 
+  // Build carousel images: featured + first 2 from images array
+  const carouselImages = [
+    property.featured_image_url,
+    ...property.images_url.slice(0, 2),
+  ].filter(Boolean) as string[]
+
   const handleFavoriteClick = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -48,34 +55,22 @@ const PropertyCard = ({
     }
   }
 
+  const googleMapsUrl = nearestStation
+    ? `https://www.google.com/maps/search/${encodeURIComponent(nearestStation.name + ' Station Tokyo')}`
+    : undefined
+
   return (
     <article className="relative overflow-hidden rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] transition-colors hover:border-[var(--color-accent)]/30">
-      {/* Image */}
-      <a
-        href={propertyUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="relative block aspect-[16/10] overflow-hidden"
-        aria-label={`View ${property.name} on e-housing.jp`}
-      >
-        {property.featured_image_url ? (
-          <Image
-            src={property.featured_image_url}
-            alt={property.name}
-            fill
-            className="object-cover transition-transform hover:scale-105"
-            sizes="(max-width: 768px) 100vw, 50vw"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-[var(--color-surface-hover)]">
-            <span className="text-[var(--color-text-secondary)]">
-              No image
-            </span>
-          </div>
-        )}
+      {/* Image Carousel */}
+      <div className="relative">
+        <ImageCarousel
+          images={carouselImages}
+          alt={property.name}
+          href={propertyUrl}
+        />
 
         {/* Badges */}
-        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+        <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-1.5">
           {property.key_money === 0 && (
             <span className="rounded-full bg-[var(--color-success)]/90 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
               No Key Money
@@ -87,29 +82,31 @@ const PropertyCard = ({
             </span>
           )}
         </div>
-      </a>
 
-      {/* Favorite Button */}
-      <button
-        onClick={handleFavoriteClick}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
-        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-        className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors hover:bg-black/60"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill={isFavorite ? 'var(--color-heart)' : 'none'}
-          stroke={isFavorite ? 'var(--color-heart)' : 'white'}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        {/* Favorite Button */}
+        <button
+          onClick={handleFavoriteClick}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          aria-label={
+            isFavorite ? 'Remove from favorites' : 'Add to favorites'
+          }
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors hover:bg-black/60"
         >
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg>
-      </button>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill={isFavorite ? 'var(--color-heart)' : 'none'}
+            stroke={isFavorite ? 'var(--color-heart)' : 'white'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </button>
+      </div>
 
       {/* Content */}
       <div className="p-4">
@@ -135,7 +132,9 @@ const PropertyCard = ({
           <span className="text-xl font-bold text-[var(--color-accent)]">
             ¥{property.rent_amount.toLocaleString()}
           </span>
-          <span className="text-sm text-[var(--color-text-secondary)]">/mo</span>
+          <span className="text-sm text-[var(--color-text-secondary)]">
+            /mo
+          </span>
         </div>
 
         {/* Details grid */}
@@ -145,9 +144,16 @@ const PropertyCard = ({
           <span>{property.layout}</span>
         </div>
 
-        {/* Nearest station */}
+        {/* Nearest station - links to Google Maps */}
         {nearestStation && (
-          <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+            aria-label={`View ${nearestStation.name} Station on Google Maps`}
+            tabIndex={0}
+          >
             <svg
               width="14"
               height="14"
@@ -164,14 +170,92 @@ const PropertyCard = ({
               <path d="M12 3v8" />
               <circle cx="12" cy="14" r="2" />
             </svg>
-            <span>
+            <span className="underline decoration-dotted underline-offset-2">
               {nearestStation.name} -{' '}
               {nearestStation.meta_data.pivot_walking_distance_minutes} min walk
             </span>
-          </div>
+          </a>
         )}
       </div>
     </article>
+  )
+}
+
+// --- Image Carousel ---
+
+const ImageCarousel = ({
+  images,
+  alt,
+  href,
+}: {
+  images: string[]
+  alt: string
+  href: string
+}) => {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  if (images.length === 0) {
+    return (
+      <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-hover)]">
+        <span className="text-[var(--color-text-secondary)]">No image</span>
+      </div>
+    )
+  }
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return
+    const scrollLeft = scrollRef.current.scrollLeft
+    const width = scrollRef.current.clientWidth
+    const index = Math.round(scrollLeft / width)
+    setActiveIndex(index)
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {images.map((src, i) => (
+          <a
+            key={src}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative aspect-[16/10] w-full shrink-0 snap-center"
+            aria-label={`${alt} - image ${i + 1} of ${images.length}`}
+          >
+            <Image
+              src={src}
+              alt={`${alt} - ${i + 1}`}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 50vw"
+              priority={i === 0}
+            />
+          </a>
+        ))}
+      </div>
+
+      {/* Dot indicators */}
+      {images.length > 1 && (
+        <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
+          {images.map((_, i) => (
+            <div
+              key={i}
+              className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                i === activeIndex
+                  ? 'bg-white'
+                  : 'bg-white/40'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

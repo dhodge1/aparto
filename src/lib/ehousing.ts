@@ -1,20 +1,50 @@
 import * as cheerio from 'cheerio'
-import type { Property, PropertiesMeta } from './types'
+import type { Property, PropertiesMeta, FilterSettings } from './types'
+import { DEFAULT_FILTERS } from './types'
+import { getFilterSettings } from './redis'
 
-const EHOUSING_SEARCH_URL =
-  'https://e-housing.jp/rent?' +
-  'wards=1%2C2%2C4%2C5%2C9' +
-  '&price_from=0' +
-  '&price_to=260000' +
-  '&wname=Minato+Ward%2CShibuya+Ward%2CMeguro+Ward%2CSetagaya+Ward%2CShinagawa+Ward' +
-  '&features=18' +
-  '&area_from=45' +
-  '&area_to=100%2B' +
-  '&walking_distance_to=12' +
-  '&location_point=139.43616821481683%2C35.482771620001955' +
-  '&location_point=139.43616821481683%2C35.80585431502774' +
-  '&location_point=140.01432367508613%2C35.80585431502774' +
-  '&location_point=140.01432367508613%2C35.482771620001955'
+// Bounding box for the Tokyo metro area
+const LOCATION_POINTS = [
+  '139.43616821481683,35.482771620001955',
+  '139.43616821481683,35.80585431502774',
+  '140.01432367508613,35.80585431502774',
+  '140.01432367508613,35.482771620001955',
+]
+
+/**
+ * Builds the e-housing.jp search URL from filter settings.
+ */
+export const buildSearchUrl = (filters: FilterSettings): string => {
+  const params = new URLSearchParams()
+
+  params.set('wards', filters.wards.join(','))
+  params.set('price_from', String(filters.priceFrom))
+  params.set('price_to', String(filters.priceTo))
+  params.set('wname', filters.wardNames.join(','))
+
+  if (filters.features.length > 0) {
+    params.set('features', filters.features.join(','))
+  }
+
+  params.set('area_from', String(filters.areaFrom))
+  params.set('area_to', String(filters.areaTo))
+  params.set('walking_distance_to', String(filters.walkingDistanceTo))
+
+  if (filters.bedRooms !== undefined) {
+    params.set('bed_rooms', String(filters.bedRooms))
+  }
+
+  if (filters.stations.length > 0) {
+    params.set('station', filters.stations.join(','))
+    params.set('sname', filters.stationNames.join(','))
+  }
+
+  for (const point of LOCATION_POINTS) {
+    params.append('location_point', point)
+  }
+
+  return `https://e-housing.jp/rent?${params.toString()}`
+}
 
 export type EHousingResult = {
   properties: Property[]
@@ -24,9 +54,20 @@ export type EHousingResult = {
 /**
  * Fetches the e-housing.jp search page and extracts property data
  * from the Next.js RSC flight payload embedded in the HTML.
+ * Reads filter settings from Redis to build the search URL dynamically.
  */
 export const fetchProperties = async (): Promise<EHousingResult> => {
-  const response = await fetch(EHOUSING_SEARCH_URL, {
+  let filters: FilterSettings
+  try {
+    filters = await getFilterSettings()
+  } catch {
+    filters = DEFAULT_FILTERS
+  }
+
+  const searchUrl = buildSearchUrl(filters)
+  console.log(`[ehousing] Fetching: ${searchUrl.substring(0, 100)}...`)
+
+  const response = await fetch(searchUrl, {
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

@@ -3,7 +3,9 @@ import type {
   Property,
   PushSubscriptionRecord,
   AppNotification,
+  FilterSettings,
 } from './types'
+import { DEFAULT_FILTERS } from './types'
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -115,6 +117,21 @@ export const addNotifications = async (
   // Trim to keep only the latest N
   pipeline.ltrim(NOTIFICATIONS_KEY, 0, MAX_NOTIFICATIONS - 1)
   await pipeline.exec()
+}
+
+// --- Filter Settings ---
+
+const FILTERS_KEY = 'settings:filters'
+
+export const getFilterSettings = async (): Promise<FilterSettings> => {
+  const data = await redis.get<FilterSettings>(FILTERS_KEY)
+  return data ?? DEFAULT_FILTERS
+}
+
+export const setFilterSettings = async (
+  filters: FilterSettings
+): Promise<void> => {
+  await redis.set(FILTERS_KEY, filters)
 }
 
 export default redis
