@@ -60,9 +60,7 @@ const PropertyCard = ({
     }
   }
 
-  const googleMapsUrl = nearestStation
-    ? `https://www.google.com/maps/search/${encodeURIComponent(nearestStation.name + ' Station Tokyo')}`
-    : undefined
+  const googleMapsUrl = `https://www.google.com/maps/@${property.latitude},${property.longitude},17z`
 
   return (
     <article className="relative overflow-hidden rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] transition-colors hover:border-[var(--color-accent)]/30">
@@ -151,14 +149,14 @@ const PropertyCard = ({
 
         {/* Station + Score row */}
         <div className="flex items-center justify-between gap-3">
-          {/* Nearest station - links to Google Maps */}
+          {/* Nearest station - links to Google Maps at property location */}
           {nearestStation && (
             <a
               href={googleMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-              aria-label={`View ${nearestStation.name} Station on Google Maps`}
+              aria-label={`View ${property.name} location on Google Maps`}
               tabIndex={0}
             >
               <svg
@@ -171,11 +169,8 @@ const PropertyCard = ({
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <rect x="4" y="3" width="16" height="18" rx="2" />
-                <path d="M12 17v4" />
-                <path d="M8 21h8" />
-                <path d="M12 3v8" />
-                <circle cx="12" cy="14" r="2" />
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
               </svg>
               <span className="underline decoration-dotted underline-offset-2">
                 {nearestStation.name} -{' '}
@@ -195,7 +190,11 @@ const PropertyCard = ({
 
         {/* Score breakdown (expandable) */}
         {showBreakdown && score && score.overall > 0 && (
-          <ScoreBreakdown score={score} />
+          <ScoreBreakdown
+            score={score}
+            lat={property.latitude}
+            lng={property.longitude}
+          />
         )}
       </div>
     </article>
@@ -353,7 +352,15 @@ const ScoreBadge = ({
 
 // --- Score Breakdown ---
 
-const ScoreBreakdown = ({ score }: { score: LivabilityScore }) => {
+const ScoreBreakdown = ({
+  score,
+  lat,
+  lng,
+}: {
+  score: LivabilityScore
+  lat: number
+  lng: number
+}) => {
   const items = [
     {
       label: 'Station',
@@ -382,10 +389,39 @@ const ScoreBreakdown = ({ score }: { score: LivabilityScore }) => {
     },
   ]
 
+  const overpassQuery = `[out:json][timeout:15];(node[shop=supermarket](around:500,${lat},${lng});node[amenity=restaurant](around:500,${lat},${lng});node[shop=convenience](around:300,${lat},${lng});way[leisure=park](around:500,${lat},${lng});node[leisure=park](around:500,${lat},${lng}););out geom;`
+  const overpassUrl = `https://overpass-turbo.eu/?Q=${encodeURIComponent(overpassQuery)}&R`
+
   return (
     <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-        Livability Breakdown
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+          Livability Breakdown
+        </span>
+        <a
+          href={overpassUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[10px] text-[var(--color-accent)] hover:underline"
+          aria-label="View amenities on map"
+          tabIndex={0}
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+          View on map
+        </a>
       </div>
       <div className="space-y-2">
         {items.map((item) => (
