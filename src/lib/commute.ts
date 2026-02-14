@@ -51,6 +51,10 @@ const fetchCommuteFromGoogle = async (
     throw new Error('GOOGLE_MAPS_API_KEY not configured')
   }
 
+  // Use next weekday at 8:00 AM JST so transit is always available
+  // (avoids "no route" errors during off-hours/weekends)
+  const departureTime = getNextWeekdayMorning()
+
   const body = {
     origin: {
       location: {
@@ -64,6 +68,7 @@ const fetchCommuteFromGoogle = async (
     },
     travelMode: 'TRANSIT',
     computeAlternativeRoutes: false,
+    departureTime,
   }
 
   const response = await fetch(ROUTES_API_URL, {
@@ -171,4 +176,34 @@ export const computeCommutes = async (
   }
 
   return commutes
+}
+
+/**
+ * Returns an ISO 8601 timestamp for the next weekday at 8:00 AM JST.
+ * This ensures the Google Routes API always has transit service available
+ * when computing routes, regardless of when the request is made.
+ */
+const getNextWeekdayMorning = (): string => {
+  const now = new Date()
+
+  // Convert to JST (UTC+9)
+  const jstOffset = 9 * 60 * 60 * 1000
+  const jstNow = new Date(now.getTime() + jstOffset)
+
+  // Start from tomorrow JST
+  const target = new Date(jstNow)
+  target.setUTCDate(target.getUTCDate() + 1)
+  target.setUTCHours(8 - 9, 0, 0, 0) // 8 AM JST = 23:00 UTC previous day
+
+  // Advance to next weekday if needed (0=Sun, 6=Sat)
+  const day = target.getUTCDay()
+  if (day === 0) target.setUTCDate(target.getUTCDate() + 1) // Sun -> Mon
+  if (day === 6) target.setUTCDate(target.getUTCDate() + 2) // Sat -> Mon
+
+  // If the target is in the past (shouldn't happen, but safety), add a week
+  if (target.getTime() < now.getTime()) {
+    target.setUTCDate(target.getUTCDate() + 7)
+  }
+
+  return target.toISOString()
 }
