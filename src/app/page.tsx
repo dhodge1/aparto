@@ -34,6 +34,7 @@ const HomePage = () => {
   const [scores, setScores] = useState<Record<string, LivabilityScore>>({})
   const [scoresLoading, setScoresLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showUpdateToast, setShowUpdateToast] = useState(false)
 
   const {
     favorites,
@@ -189,12 +190,18 @@ const HomePage = () => {
   useEffect(() => {
     fetchListings()
 
-    // Register service worker
+    // Register service worker and listen for update messages
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
         .then((reg) => console.log('SW registered:', reg.scope))
         .catch((err) => console.error('SW registration failed:', err))
+
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'NEW_DATA_AVAILABLE') {
+          setShowUpdateToast(true)
+        }
+      })
     }
   }, [fetchListings])
 
@@ -392,6 +399,16 @@ const HomePage = () => {
         )}
       </main>
 
+      {/* Update toast */}
+      <UpdateToast
+        visible={showUpdateToast}
+        onRefresh={() => {
+          setShowUpdateToast(false)
+          fetchListings()
+        }}
+        onDismiss={() => setShowUpdateToast(false)}
+      />
+
       {/* Install prompt */}
       <InstallPrompt />
 
@@ -466,6 +483,74 @@ const EmptyState = ({ message }: { message: string }) => (
     </p>
   </div>
 )
+
+const UpdateToast = ({
+  visible,
+  onRefresh,
+  onDismiss,
+}: {
+  visible: boolean
+  onRefresh: () => void
+  onDismiss: () => void
+}) => {
+  useEffect(() => {
+    if (!visible) return
+    const timer = setTimeout(onDismiss, 15000)
+    return () => clearTimeout(timer)
+  }, [visible, onDismiss])
+
+  if (!visible) return null
+
+  return (
+    <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-4">
+      <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 shadow-lg">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)]/20">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--color-accent)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+        </div>
+        <span className="text-sm text-[var(--color-text)]">
+          Listings updated
+        </span>
+        <button
+          onClick={onRefresh}
+          className="rounded-full bg-[var(--color-accent)] px-3 py-1 text-xs font-semibold text-white"
+          tabIndex={0}
+        >
+          Refresh
+        </button>
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          tabIndex={0}
+          className="p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
 
 const formatLastPoll = (timestamp: string): string => {
   const now = Date.now()
