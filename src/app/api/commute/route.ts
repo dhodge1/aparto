@@ -1,16 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { computeCommutes } from '@/lib/commute'
 import { getCachedCommutes } from '@/lib/redis'
+import { Redis } from '@upstash/redis'
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+})
 
 /**
  * GET /api/commute?properties=id:lat:lng,id:lat:lng,...
- *
- * Returns commute info (duration + transfers) for each property.
- * Cached results are returned immediately; only uncached properties
- * trigger Google Routes API calls.
+ * GET /api/commute?flush=true  (clears all commute cache entries)
  */
 export const GET = async (request: NextRequest): Promise<NextResponse> => {
   try {
+    // Flush commute cache if requested (for debugging)
+    const flush = request.nextUrl.searchParams.get('flush')
+    if (flush === 'true') {
+      const keys = await redis.keys('commute:*')
+      if (keys.length > 0) {
+        const pipeline = redis.pipeline()
+        for (const key of keys) {
+          pipeline.del(key)
+        }
+        await pipeline.exec()
+      }
+      return NextResponse.json({
+        flushed: keys.length,
+        message: `Cleared ${keys.length} commute cache entries`,
+      })
+    }
+
     const propertiesParam = request.nextUrl.searchParams.get('properties')
     if (!propertiesParam) {
       return NextResponse.json(
