@@ -5,11 +5,8 @@ const ROUTES_API_URL =
   'https://routes.googleapis.com/directions/v2:computeRoutes'
 
 // Nishimachi International School
-// 2 Chome-14-7 Motoazabu, Minato City, Tokyo 106-0046
-const DESTINATION = {
-  latitude: 35.6528,
-  longitude: 139.7286,
-}
+const DESTINATION_ADDRESS =
+  'Nishimachi International School, 2 Chome-14-7 Motoazabu, Minato City, Tokyo 106-0046'
 
 const RATE_LIMIT_DELAY_MS = 200
 
@@ -55,6 +52,9 @@ const fetchCommuteFromGoogle = async (
   // (avoids "no route" errors during off-hours/weekends)
   const departureTime = getNextWeekdayMorning()
 
+  // Strip milliseconds - docs show "yyyy-mm-ddThh:mm:ssZ" format
+  const departureTimeFormatted = departureTime.replace(/\.\d{3}Z$/, 'Z')
+
   const body = {
     origin: {
       location: {
@@ -62,13 +62,11 @@ const fetchCommuteFromGoogle = async (
       },
     },
     destination: {
-      location: {
-        latLng: DESTINATION,
-      },
+      address: DESTINATION_ADDRESS,
     },
     travelMode: 'TRANSIT',
     computeAlternativeRoutes: false,
-    departureTime,
+    departureTime: departureTimeFormatted,
   }
 
   console.log(`[commute] Request body: ${JSON.stringify(body)}`)
