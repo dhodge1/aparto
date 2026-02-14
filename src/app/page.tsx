@@ -367,10 +367,16 @@ const HomePage = () => {
               <NotificationBanner notifications={data.notifications} />
             )}
 
-            {/* Property cards */}
+            {/* Property cards - sorted newest first */}
             {data.listings.length > 0 ? (
               <div className="space-y-4">
-                {data.listings.map((property) => (
+                {[...data.listings]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.created_at).getTime() -
+                      new Date(a.created_at).getTime()
+                  )
+                  .map((property) => (
                   <PropertyCard
                     key={property.id}
                     property={property}

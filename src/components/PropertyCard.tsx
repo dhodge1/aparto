@@ -147,37 +147,67 @@ const PropertyCard = ({
           <span>{property.layout}</span>
         </div>
 
-        {/* Station + Score row */}
-        <div className="flex items-center justify-between gap-3">
-          {/* Nearest station - links to Google Maps at property location */}
-          {nearestStation && (
-            <a
-              href={googleMapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-              aria-label={`View ${property.name} location on Google Maps`}
-              tabIndex={0}
+        {/* Nearest station */}
+        {nearestStation && (
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+            aria-label={`View ${property.name} location on Google Maps`}
+            tabIndex={0}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              <span className="underline decoration-dotted underline-offset-2">
-                {nearestStation.name} -{' '}
-                {nearestStation.meta_data.pivot_walking_distance_minutes} min walk
-              </span>
-            </a>
-          )}
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span className="underline decoration-dotted underline-offset-2">
+              {nearestStation.name} -{' '}
+              {nearestStation.meta_data.pivot_walking_distance_minutes} min walk
+            </span>
+          </a>
+        )}
+
+        {/* Commute + Livability row */}
+        <div className="mt-2 flex items-center justify-between gap-3">
+          {/* Commute to Nishimachi */}
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&origin=${property.latitude},${property.longitude}&destination=Nishimachi+International+School+Tokyo&travelmode=transit`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+            aria-label="View transit commute to Nishimachi International School"
+            tabIndex={0}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="4" y="3" width="16" height="18" rx="2" />
+              <path d="M12 17v4" />
+              <path d="M8 21h8" />
+              <path d="M12 3v8" />
+              <circle cx="12" cy="14" r="2" />
+            </svg>
+            <span className="underline decoration-dotted underline-offset-2">
+              Commute to Nishimachi
+            </span>
+          </a>
 
           {/* Livability score badge */}
           <ScoreBadge
@@ -196,35 +226,6 @@ const PropertyCard = ({
             lng={property.longitude}
           />
         )}
-
-        {/* Commute to Nishimachi */}
-        <a
-          href={`https://www.google.com/maps/dir/?api=1&origin=${property.latitude},${property.longitude}&destination=Nishimachi+International+School+Tokyo&travelmode=transit`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-          aria-label="View transit commute to Nishimachi International School"
-          tabIndex={0}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2.81A2 2 0 0 1 20 8v8a2 2 0 0 1-2 2h-2" />
-            <path d="M14 2l-4 6h8l-4-6z" />
-            <circle cx="7" cy="18" r="2" />
-            <circle cx="17" cy="18" r="2" />
-          </svg>
-          <span className="underline decoration-dotted underline-offset-2">
-            Commute to Nishimachi
-          </span>
-        </a>
       </div>
     </article>
   )

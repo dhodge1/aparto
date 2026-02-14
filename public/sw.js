@@ -236,23 +236,26 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  const url = event.notification.data?.url || '/'
-
   if (event.action === 'dismiss') return
 
+  // Invalidate the listings cache so the app shows fresh data
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clientList) => {
+    (async () => {
+      const cache = await caches.open(DATA_CACHE)
+      const keys = await cache.keys()
+      for (const key of keys) {
+        await cache.delete(key)
+      }
+
+      // Open or focus the app
+      const clientList = await self.clients.matchAll({ type: 'window' })
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(
-            url.startsWith('http') ? url : self.location.origin + url
-          )
+          client.navigate(self.location.origin + '/')
           return client.focus()
         }
       }
-      return self.clients.openWindow(
-        url.startsWith('http') ? url : self.location.origin + url
-      )
-    })
+      return self.clients.openWindow(self.location.origin + '/')
+    })()
   )
 })

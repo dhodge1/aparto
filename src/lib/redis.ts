@@ -101,9 +101,17 @@ const hashEndpoint = (endpoint: string): string => {
 const NOTIFICATIONS_KEY = 'notifications:history'
 const MAX_NOTIFICATIONS = 50
 
+const NOTIFICATION_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 hours
+
 export const getNotificationHistory = async (): Promise<AppNotification[]> => {
   const data = await redis.lrange(NOTIFICATIONS_KEY, 0, MAX_NOTIFICATIONS - 1)
-  return (data ?? []) as unknown as AppNotification[]
+  const all = (data ?? []) as unknown as AppNotification[]
+
+  // Filter out notifications older than 24 hours
+  const cutoff = Date.now() - NOTIFICATION_MAX_AGE_MS
+  return all.filter(
+    (n) => new Date(n.timestamp).getTime() > cutoff
+  )
 }
 
 export const addNotifications = async (
