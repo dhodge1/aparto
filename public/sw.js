@@ -3,7 +3,7 @@
 // Service Worker for Aparto PWA
 // Handles push notifications, offline caching, and stale-while-revalidate
 
-const SHELL_CACHE = 'aparto-shell-v2'
+const SHELL_CACHE = 'aparto-shell-v3'
 const DATA_CACHE = 'aparto-data-v1'
 const STATIC_CACHE = 'aparto-static-v1'
 
@@ -17,6 +17,7 @@ const NETWORK_ONLY_ROUTES = [
   '/api/scores',
   '/api/subscribe',
   '/api/poll',
+  '/api/commute',
 ]
 
 // --- Install ---
