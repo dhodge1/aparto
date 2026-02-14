@@ -6,6 +6,7 @@ import type {
   AppNotification,
   FilterSettings,
   LivabilityScore,
+  CommuteInfo,
 } from '@/lib/types'
 import { useFavorites } from '@/hooks/useFavorites'
 import PropertyCard from '@/components/PropertyCard'
@@ -33,6 +34,8 @@ const HomePage = () => {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [scores, setScores] = useState<Record<string, LivabilityScore>>({})
   const [scoresLoading, setScoresLoading] = useState(false)
+  const [commutes, setCommutes] = useState<Record<string, CommuteInfo>>({})
+  const [commutesLoading, setCommutesLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showUpdateToast, setShowUpdateToast] = useState(false)
 
@@ -82,6 +85,28 @@ const HomePage = () => {
     }
   }, [])
 
+  const fetchCommutes = useCallback(async (listings: Property[]) => {
+    if (listings.length === 0) return
+
+    setCommutesLoading(true)
+    try {
+      const descriptors = listings.map(
+        (p) => `${p.id}:${p.latitude}:${p.longitude}`
+      )
+
+      const response = await fetch(
+        `/api/commute?properties=${descriptors.join(',')}`
+      )
+      if (!response.ok) throw new Error('Failed to fetch commutes')
+      const json = await response.json()
+      setCommutes(json.commutes ?? {})
+    } catch (err) {
+      console.error('Commute fetch error:', err)
+    } finally {
+      setCommutesLoading(false)
+    }
+  }, [])
+
   const fetchListings = useCallback(async () => {
     try {
       setLoading(true)
@@ -90,14 +115,15 @@ const HomePage = () => {
       if (!response.ok) throw new Error('Failed to fetch listings')
       const json = (await response.json()) as ListingsData
       setData(json)
-      // Fetch scores asynchronously after listings load
+      // Fetch scores and commutes asynchronously after listings load
       fetchScores(json.listings)
+      fetchCommutes(json.listings)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }
-  }, [fetchScores])
+  }, [fetchScores, fetchCommutes])
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -108,12 +134,13 @@ const HomePage = () => {
       const json = (await response.json()) as ListingsData
       setData(json)
       fetchScores(json.listings)
+      fetchCommutes(json.listings)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed')
     } finally {
       setRefreshing(false)
     }
-  }, [fetchScores])
+  }, [fetchScores, fetchCommutes])
 
   const handleApplyFilters = useCallback(
     async (filters: FilterSettings) => {
@@ -378,6 +405,8 @@ const HomePage = () => {
                     onToggleFavorite={toggleFavorite}
                     score={scores[String(property.id)]}
                     scoreLoading={scoresLoading}
+                    commute={commutes[String(property.id)]}
+                    commuteLoading={commutesLoading}
                   />
                 ))}
               </div>

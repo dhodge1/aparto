@@ -149,6 +149,14 @@ export type LivabilityScore = {
   computedAt: string
 }
 
+export type CommuteInfo = {
+  propertyId: number
+  durationMinutes: number
+  durationText: string
+  transferCount: number
+  computedAt: string
+}
+
 export const DEFAULT_FILTERS: FilterSettings = {
   wards: [1, 2, 4, 5, 9],
   wardNames: [
