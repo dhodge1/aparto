@@ -91,6 +91,10 @@ const fetchCommuteFromGoogle = async (
 
   const data = (await response.json()) as RoutesApiResponse
 
+  console.log(
+    `[commute] API response for ${lat},${lng}: departureTime=${departureTime}, routes=${data.routes?.length ?? 0}, raw=${JSON.stringify(data).substring(0, 500)}`
+  )
+
   const route = data.routes?.[0]
   if (!route) {
     throw new Error('No route found')
@@ -148,8 +152,12 @@ export const computeCommutes = async (
 ): Promise<CommuteInfo[]> => {
   const commutes: CommuteInfo[] = []
 
-  for (let i = 0; i < properties.length; i++) {
-    const property = properties[i]
+  // DEBUG: limit to first property only to conserve quota while debugging
+  const debugLimit = 1
+  const limited = properties.slice(0, debugLimit)
+
+  for (let i = 0; i < limited.length; i++) {
+    const property = limited[i]
 
     try {
       const commute = await computeCommute(property)
@@ -159,18 +167,20 @@ export const computeCommutes = async (
         `[commute] Failed for property ${property.id}:`,
         error
       )
-      // Return a placeholder on error so the UI can still render
-      commutes.push({
+      // Cache the failure with a short TTL to prevent quota burn on retries
+      const errorPlaceholder: CommuteInfo = {
         propertyId: property.id,
         durationMinutes: 0,
         durationText: '',
         transferCount: 0,
         computedAt: new Date().toISOString(),
-      })
+      }
+      await setCachedCommute(errorPlaceholder)
+      commutes.push(errorPlaceholder)
     }
 
     // Rate limit delay between API calls
-    if (i < properties.length - 1) {
+    if (i < limited.length - 1) {
       await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS))
     }
   }

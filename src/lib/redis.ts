@@ -184,6 +184,7 @@ export const setCachedScore = async (
 
 const COMMUTE_KEY_PREFIX = 'commute:'
 const COMMUTE_TTL_SECONDS = 30 * 24 * 60 * 60 // 30 days
+const COMMUTE_ERROR_TTL_SECONDS = 12 * 60 * 60 // 12 hours for failed lookups
 
 export const getCachedCommute = async (
   propertyId: number
@@ -217,10 +218,16 @@ export const getCachedCommutes = async (
 export const setCachedCommute = async (
   commute: CommuteInfo
 ): Promise<void> => {
+  // Use shorter TTL for failed lookups so they get retried sooner
+  const ttl =
+    commute.durationMinutes === 0
+      ? COMMUTE_ERROR_TTL_SECONDS
+      : COMMUTE_TTL_SECONDS
+
   await redis.set(
     `${COMMUTE_KEY_PREFIX}${commute.propertyId}`,
     commute,
-    { ex: COMMUTE_TTL_SECONDS }
+    { ex: ttl }
   )
 }
 
