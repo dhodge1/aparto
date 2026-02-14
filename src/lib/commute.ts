@@ -4,9 +4,8 @@ import { getCachedCommute, setCachedCommute } from './redis'
 const ROUTES_API_URL =
   'https://routes.googleapis.com/directions/v2:computeRoutes'
 
-// Nishimachi International School
-const DESTINATION_ADDRESS =
-  'Nishimachi International School, 2 Chome-14-7 Motoazabu, Minato City, Tokyo 106-0046'
+// Nishimachi International School - placeId from geocoding result
+const DESTINATION_PLACE_ID = 'ChIJgdIvrQqLGGARPotXFpkJFlE'
 
 const RATE_LIMIT_DELAY_MS = 200
 
@@ -57,12 +56,10 @@ const fetchCommuteFromGoogle = async (
 
   const body = {
     origin: {
-      location: {
-        latLng: { latitude: lat, longitude: lng },
-      },
+      address: `${lat},${lng}`,
     },
     destination: {
-      address: DESTINATION_ADDRESS,
+      placeId: DESTINATION_PLACE_ID,
     },
     travelMode: 'TRANSIT',
     computeAlternativeRoutes: false,
