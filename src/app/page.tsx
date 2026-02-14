@@ -129,19 +129,23 @@ const HomePage = () => {
       if (!response.ok) throw new Error('Failed to save settings')
 
       const json = await response.json()
+      const now = new Date().toISOString()
       setData((prev) => ({
         ...prev,
         listings: json.listings,
         count: json.count,
-        lastPoll: new Date().toISOString(),
+        lastPoll: now,
         notifications: prev?.notifications ?? [],
-        searchUrl: undefined, // Will be refreshed on next listings fetch
+        searchUrl: undefined,
       }))
 
-      // Refresh to get the updated search URL
-      await fetchListings()
+      // Fetch scores for the new listings
+      fetchScores(json.listings)
+
+      // Update the SW cache in the background (don't await or set state)
+      fetch('/api/listings').catch(() => {})
     },
-    [fetchListings]
+    [fetchScores]
   )
 
   // Swipe-to-open settings from left edge
