@@ -108,6 +108,9 @@ const HomePage = () => {
       const json = (await response.json()) as ListingsData
       setData(json)
       fetchScores(json.listings)
+
+      // Update the SW listings cache so next app open shows fresh data
+      fetch('/api/listings').catch(() => {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed')
     } finally {
