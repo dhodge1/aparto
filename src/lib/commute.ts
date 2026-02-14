@@ -71,13 +71,15 @@ const fetchCommuteFromGoogle = async (
     departureTime,
   }
 
+  console.log(`[commute] Request body: ${JSON.stringify(body)}`)
+
+  // DEBUG: No field mask to see full response structure
   const response = await fetch(ROUTES_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask':
-        'routes.duration,routes.legs.steps.transitDetails',
+      'X-Goog-FieldMask': '*',
     },
     body: JSON.stringify(body),
   })
@@ -91,8 +93,9 @@ const fetchCommuteFromGoogle = async (
 
   const data = (await response.json()) as RoutesApiResponse
 
+  const rawJson = JSON.stringify(data)
   console.log(
-    `[commute] API response for ${lat},${lng}: departureTime=${departureTime}, routes=${data.routes?.length ?? 0}, raw=${JSON.stringify(data).substring(0, 500)}`
+    `[commute] API response for ${lat},${lng}: departureTime=${departureTime}, routes=${data.routes?.length ?? 0}, responseLength=${rawJson.length}, raw=${rawJson.substring(0, 2000)}`
   )
 
   const route = data.routes?.[0]
