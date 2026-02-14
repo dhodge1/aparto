@@ -17,7 +17,6 @@ const NETWORK_ONLY_ROUTES = [
   '/api/scores',
   '/api/subscribe',
   '/api/poll',
-  '/api/commute',
 ]
 
 // --- Install ---

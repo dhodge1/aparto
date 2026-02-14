@@ -5,7 +5,6 @@ import type {
   AppNotification,
   FilterSettings,
   LivabilityScore,
-  CommuteInfo,
 } from './types'
 import { DEFAULT_FILTERS } from './types'
 
@@ -177,57 +176,6 @@ export const setCachedScore = async (
     `${SCORE_KEY_PREFIX}${score.propertyId}`,
     score,
     { ex: SCORE_TTL_SECONDS }
-  )
-}
-
-// --- Commute Info ---
-
-const COMMUTE_KEY_PREFIX = 'commute:'
-const COMMUTE_TTL_SECONDS = 30 * 24 * 60 * 60 // 30 days
-const COMMUTE_ERROR_TTL_SECONDS = 12 * 60 * 60 // 12 hours for failed lookups
-
-export const getCachedCommute = async (
-  propertyId: number
-): Promise<CommuteInfo | null> => {
-  return redis.get<CommuteInfo>(`${COMMUTE_KEY_PREFIX}${propertyId}`)
-}
-
-export const getCachedCommutes = async (
-  propertyIds: number[]
-): Promise<Map<number, CommuteInfo>> => {
-  if (propertyIds.length === 0) return new Map()
-
-  const pipeline = redis.pipeline()
-  for (const id of propertyIds) {
-    pipeline.get(`${COMMUTE_KEY_PREFIX}${id}`)
-  }
-
-  const results = await pipeline.exec()
-  const commuteMap = new Map<number, CommuteInfo>()
-
-  for (let i = 0; i < propertyIds.length; i++) {
-    const commute = results[i] as CommuteInfo | null
-    if (commute) {
-      commuteMap.set(propertyIds[i], commute)
-    }
-  }
-
-  return commuteMap
-}
-
-export const setCachedCommute = async (
-  commute: CommuteInfo
-): Promise<void> => {
-  // Use shorter TTL for failed lookups so they get retried sooner
-  const ttl =
-    commute.durationMinutes === 0
-      ? COMMUTE_ERROR_TTL_SECONDS
-      : COMMUTE_TTL_SECONDS
-
-  await redis.set(
-    `${COMMUTE_KEY_PREFIX}${commute.propertyId}`,
-    commute,
-    { ex: ttl }
   )
 }
 

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import Image from 'next/image'
-import type { Property, LivabilityScore, CommuteInfo } from '@/lib/types'
+import type { Property, LivabilityScore } from '@/lib/types'
 import { buildPropertyUrl } from '@/lib/ehousing'
 
 type PropertyCardProps = {
@@ -11,8 +11,6 @@ type PropertyCardProps = {
   onToggleFavorite: (property: Property) => void
   score?: LivabilityScore | null
   scoreLoading?: boolean
-  commute?: CommuteInfo | null
-  commuteLoading?: boolean
 }
 
 const PropertyCard = ({
@@ -21,8 +19,6 @@ const PropertyCard = ({
   onToggleFavorite,
   score,
   scoreLoading,
-  commute,
-  commuteLoading,
 }: PropertyCardProps) => {
   const [showBreakdown, setShowBreakdown] = useState(false)
   const nearestStation = property.trainStations.reduce(
@@ -202,7 +198,33 @@ const PropertyCard = ({
         )}
 
         {/* Commute to Nishimachi */}
-        <CommuteDisplay commute={commute} loading={commuteLoading} />
+        <a
+          href={`https://www.google.com/maps/dir/?api=1&origin=${property.latitude},${property.longitude}&destination=Nishimachi+International+School+Tokyo&travelmode=transit`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+          aria-label="View transit commute to Nishimachi International School"
+          tabIndex={0}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2.81A2 2 0 0 1 20 8v8a2 2 0 0 1-2 2h-2" />
+            <path d="M14 2l-4 6h8l-4-6z" />
+            <circle cx="7" cy="18" r="2" />
+            <circle cx="17" cy="18" r="2" />
+          </svg>
+          <span className="underline decoration-dotted underline-offset-2">
+            Commute to Nishimachi
+          </span>
+        </a>
       </div>
     </article>
   )
@@ -455,72 +477,6 @@ const ScoreBreakdown = ({
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-// --- Commute Display ---
-
-const CommuteDisplay = ({
-  commute,
-  loading,
-}: {
-  commute?: CommuteInfo | null
-  loading?: boolean
-}) => {
-  if (loading) {
-    return (
-      <div className="mt-2 flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="animate-spin"
-        >
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-        </svg>
-        <span className="text-xs">Calculating commute...</span>
-      </div>
-    )
-  }
-
-  if (!commute || commute.durationMinutes === 0) return null
-
-  const transferText =
-    commute.transferCount === 0
-      ? 'direct'
-      : commute.transferCount === 1
-        ? '1 transfer'
-        : `${commute.transferCount} transfers`
-
-  return (
-    <div className="mt-2 flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2.81A2 2 0 0 1 20 8v8a2 2 0 0 1-2 2h-2" />
-        <path d="M14 2l-4 6h8l-4-6z" />
-        <circle cx="7" cy="18" r="2" />
-        <circle cx="17" cy="18" r="2" />
-      </svg>
-      <span>
-        {commute.durationText} · {transferText}
-        <span className="text-[var(--color-text-secondary)]/60">
-          {' '}to Nishimachi
-        </span>
-      </span>
     </div>
   )
 }
