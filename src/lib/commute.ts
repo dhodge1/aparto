@@ -56,25 +56,27 @@ const fetchCommuteFromGoogle = async (
 
   const body = {
     origin: {
-      address: `${lat},${lng}`,
+      location: {
+        latLng: { latitude: lat, longitude: lng },
+      },
     },
     destination: {
       placeId: DESTINATION_PLACE_ID,
     },
     travelMode: 'TRANSIT',
-    computeAlternativeRoutes: false,
     departureTime: departureTimeFormatted,
   }
 
   console.log(`[commute] Request body: ${JSON.stringify(body)}`)
 
-  // DEBUG: No field mask to see full response structure
+  // Use exact field mask from docs transit example
   const response = await fetch(ROUTES_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': '*',
+      'X-Goog-FieldMask':
+        'routes.duration,routes.legs.steps.transitDetails,routes.legs.steps.travelMode',
     },
     body: JSON.stringify(body),
   })
