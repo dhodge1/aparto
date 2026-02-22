@@ -155,6 +155,8 @@ const HomePage = () => {
   useEffect(() => {
     const handleEdgeTouchStart = (e: TouchEvent) => {
       if (settingsOpen) return
+      // Don't open settings if a lightbox or modal is open
+      if (document.body.style.overflow === 'hidden') return
       const x = e.touches[0].clientX
       // Only trigger if starting from the left 20px edge
       if (x < 20) {
