@@ -1,9 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import type { Property, LivabilityScore } from '@/lib/types'
 import { buildPropertyUrl } from '@/lib/ehousing'
+
+const EHOUSING_CDN_PREFIX =
+  'https://cdn.shortpixel.ai/client/to_webp,w_1500,q_lossless,ret_wait/https://s3.ap-northeast-1.amazonaws.com/ehousing-dev/'
 
 type PropertyCardProps = {
   property: Property
@@ -21,6 +24,8 @@ const PropertyCard = ({
   scoreLoading,
 }: PropertyCardProps) => {
   const [showBreakdown, setShowBreakdown] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
   const nearestStation = property.trainStations.reduce(
     (nearest, station) => {
       if (
@@ -42,9 +47,15 @@ const PropertyCard = ({
     property.room_number
   )
 
-  // All images: featured + all from images array
+  // Build floor plan full URLs from raw paths
+  const floorPlanUrls = property.floor_plan_images
+    .map((path) => `${EHOUSING_CDN_PREFIX}${path}`)
+    .filter(Boolean)
+
+  // Order: featured, floor plans, then rest of photos
   const carouselImages = [
     property.featured_image_url,
+    ...floorPlanUrls,
     ...property.images_url,
   ].filter(Boolean) as string[]
 
@@ -72,8 +83,37 @@ const PropertyCard = ({
           href={propertyUrl}
         />
 
+        {/* Fullscreen button */}
+        <button
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setLightboxIndex(0)
+            setLightboxOpen(true)
+          }}
+          tabIndex={0}
+          aria-label="View images fullscreen"
+          className="absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors hover:bg-black/60"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="8" x2="11" y2="14" />
+            <line x1="8" y1="11" x2="14" y2="11" />
+          </svg>
+        </button>
+
         {/* Badges */}
-        <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-1.5">
+        <div className="absolute left-14 top-3 z-10 flex flex-wrap gap-1.5">
           {property.key_money === 0 && (
             <span className="rounded-full bg-[var(--color-success)]/90 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
               No Key Money
@@ -220,7 +260,145 @@ const PropertyCard = ({
           />
         )}
       </div>
+
+      {/* Fullscreen Lightbox */}
+      {lightboxOpen && (
+        <Lightbox
+          images={carouselImages}
+          initialIndex={lightboxIndex}
+          alt={property.name}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </article>
+  )
+}
+
+// --- Fullscreen Lightbox ---
+
+const Lightbox = ({
+  images,
+  initialIndex,
+  alt,
+  onClose,
+}: {
+  images: string[]
+  initialIndex: number
+  alt: string
+  onClose: () => void
+}) => {
+  const [index, setIndex] = useState(initialIndex)
+  const touchStartX = useRef(0)
+
+  // Lock body scroll
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [])
+
+  const handlePrev = useCallback(() => {
+    setIndex((i) => (i === 0 ? images.length - 1 : i - 1))
+  }, [images.length])
+
+  const handleNext = useCallback(() => {
+    setIndex((i) => (i === images.length - 1 ? 0 : i + 1))
+  }, [images.length])
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }, [])
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const delta = touchStartX.current - e.changedTouches[0].clientX
+      if (Math.abs(delta) > 50) {
+        if (delta > 0) handleNext()
+        else handlePrev()
+      }
+    },
+    [handleNext, handlePrev]
+  )
+
+  // Close on escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') handlePrev()
+      if (e.key === 'ArrowRight') handleNext()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose, handlePrev, handleNext])
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col bg-black"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-sm text-white/70">
+          {index + 1} / {images.length}
+        </span>
+        <button
+          onClick={onClose}
+          aria-label="Close fullscreen"
+          tabIndex={0}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:text-white"
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Image */}
+      <div className="relative flex flex-1 items-center justify-center px-2">
+        <Image
+          src={images[index]}
+          alt={`${alt} - ${index + 1}`}
+          fill
+          className="object-contain"
+          sizes="100vw"
+          priority
+        />
+      </div>
+
+      {/* Dot indicators */}
+      <div className="flex justify-center py-3">
+        {images.length <= 15 ? (
+          <div className="flex gap-1">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIndex(i)}
+                tabIndex={0}
+                aria-label={`Go to image ${i + 1}`}
+                className={`h-1.5 rounded-full transition-colors ${
+                  i === index ? 'w-3 bg-white' : 'w-1.5 bg-white/30'
+                }`}
+              />
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-white/50">
+            Swipe to navigate
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
