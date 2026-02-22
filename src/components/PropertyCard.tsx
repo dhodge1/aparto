@@ -42,10 +42,10 @@ const PropertyCard = ({
     property.room_number
   )
 
-  // Build carousel images: featured + first 2 from images array
+  // All images: featured + all from images array
   const carouselImages = [
     property.featured_image_url,
-    ...property.images_url.slice(0, 4),
+    ...property.images_url,
   ].filter(Boolean) as string[]
 
   const handleFavoriteClick = (e: React.MouseEvent | React.KeyboardEvent) => {
@@ -237,6 +237,7 @@ const ImageCarousel = ({
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  const isScrolling = useRef(false)
 
   if (images.length === 0) {
     return (
@@ -246,12 +247,35 @@ const ImageCarousel = ({
     )
   }
 
-  const handleScroll = () => {
+  const scrollToIndex = (index: number) => {
     if (!scrollRef.current) return
+    const width = scrollRef.current.clientWidth
+    isScrolling.current = true
+    scrollRef.current.scrollTo({ left: width * index, behavior: 'smooth' })
+    setActiveIndex(index)
+    setTimeout(() => { isScrolling.current = false }, 350)
+  }
+
+  const handleScroll = () => {
+    if (!scrollRef.current || isScrolling.current) return
     const scrollLeft = scrollRef.current.scrollLeft
     const width = scrollRef.current.clientWidth
     const index = Math.round(scrollLeft / width)
     setActiveIndex(index)
+  }
+
+  const handleScrollEnd = () => {
+    if (!scrollRef.current || isScrolling.current) return
+    if (images.length <= 1) return
+
+    const scrollLeft = scrollRef.current.scrollLeft
+    const width = scrollRef.current.clientWidth
+    const maxScroll = scrollRef.current.scrollWidth - width
+
+    // Loop: if at the end, snap to first
+    if (scrollLeft >= maxScroll - 2) {
+      setTimeout(() => scrollToIndex(0), 200)
+    }
   }
 
   return (
@@ -259,12 +283,13 @@ const ImageCarousel = ({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        onTouchEnd={handleScrollEnd}
         className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {images.map((src, i) => (
           <a
-            key={src}
+            key={`${src}-${i}`}
             href={href}
             target="_blank"
             rel="noopener noreferrer"
@@ -278,6 +303,7 @@ const ImageCarousel = ({
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
               priority={i === 0}
+              loading={i === 0 ? 'eager' : 'lazy'}
             />
           </a>
         ))}
@@ -285,17 +311,23 @@ const ImageCarousel = ({
 
       {/* Dot indicators */}
       {images.length > 1 && (
-        <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
-          {images.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                i === activeIndex
-                  ? 'bg-white'
-                  : 'bg-white/40'
-              }`}
-            />
-          ))}
+        <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-1">
+          {images.length <= 12 ? (
+            images.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1.5 rounded-full transition-colors ${
+                  i === activeIndex
+                    ? 'w-3 bg-white'
+                    : 'w-1.5 bg-white/40'
+                }`}
+              />
+            ))
+          ) : (
+            <span className="text-[10px] text-white/80 bg-black/30 px-1.5 py-0.5 rounded-full">
+              {activeIndex + 1} / {images.length}
+            </span>
+          )}
         </div>
       )}
     </div>
