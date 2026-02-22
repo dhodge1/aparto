@@ -48,7 +48,7 @@ const PropertyCard = ({
   )
 
   // Build floor plan full URLs from raw paths
-  const floorPlanUrls = property.floor_plan_images
+  const floorPlanUrls = (property.floor_plan_images ?? [])
     .map((path) => `${EHOUSING_CDN_PREFIX}${path}`)
     .filter(Boolean)
 
